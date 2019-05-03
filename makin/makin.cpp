@@ -5,6 +5,7 @@
 //
 
 #include "stdafx.h"
+#include <Psapi.h>
 
 enum DrReg
 {
@@ -29,7 +30,7 @@ inline void SetBits(DWORD_PTR& dw, const DWORD_PTR lowBit, const DWORD_PTR bits,
 
 VOID ProcessOutputString(const PROCESS_INFORMATION pi, const OUTPUT_DEBUG_STRING_INFO out_info)
 {
-	std::unique_ptr<CHAR> pMsg{new CHAR[out_info.nDebugStringLength * sizeof(CHAR)]};
+	std::unique_ptr<CHAR[]> pMsg{new CHAR[out_info.nDebugStringLength * sizeof(CHAR)]};
 
 	ReadProcessMemory(pi.hProcess, out_info.lpDebugStringData, pMsg.get(), out_info.nDebugStringLength, nullptr);
 
@@ -40,7 +41,7 @@ VOID ProcessOutputString(const PROCESS_INFORMATION pi, const OUTPUT_DEBUG_STRING
 
 
 	auto cmdSubStr = strstr(pMsg.get(), "DBG_NEW_PROC:");
-	if (cmdSubStr)
+	if (cmdSubStr != nullptr)
 	{
 		cmdSubStr += 13;
 		printf_s("Monitor new process in a new console...\n\n");
@@ -66,20 +67,20 @@ VOID ProcessOutputString(const PROCESS_INFORMATION pi, const OUTPUT_DEBUG_STRING
 		printf_s("[OutputDebugString] msg: %s\n\n", pMsg.get()); // raw message from the sample
 		return;
 	}
-	else if (strlen(pMsg.get()) > 3 && (pMsg.get()[0] == '[' && pMsg.get()[1] == '_' && pMsg.get()[2] == ']'))
+	if (strlen(pMsg.get()) > 3 && (pMsg.get()[0] == '[' && pMsg.get()[1] == '_' && pMsg.get()[2] == ']'))
 		// [_]
 	{
-		for (size_t i = 0; i < loadDll.size(); ++i)
+		for (const auto& i : loadDll)
 		{
 			CHAR tmp[MAX_PATH + 2]{};
 			strcpy_s(tmp, MAX_PATH + 2, pMsg.get() + 3);
-			const std::string wtmp(tmp);
-			if (!wtmp.compare(loadDll[i])) // #SOURCE - The "Ultimate" Anti-Debugging Reference: 7.B.iv
+			const std::string tmpStr(tmp);
+			if (tmpStr == i) // #SOURCE - The "Ultimate" Anti-Debugging Reference: 7.B.iv
 			{
 				hookFunctions.emplace_back("LdrLoadDll");
 				printf(
 					"[LdrLoadDll] The debuggee attempts to use LdrLoadDll/NtCreateFile trick: %s\n\tref: The \"Ultimate\" Anti-Debugging Reference: 7.B.iv\n\n",
-					wtmp.data());
+					tmpStr.data());
 			}
 		}
 		return;
@@ -92,69 +93,118 @@ VOID ProcessOutputString(const PROCESS_INFORMATION pi, const OUTPUT_DEBUG_STRING
 
 	// ntdll
 	if (tmpStr.find("NtClose") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtClose");
+	}
 	else if (tmpStr.find("NtOpenProcess") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtOpenProcess");
+	}
 	else if (tmpStr.find("NtCreateFile") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtCreateFile");
+	}
 	else if (tmpStr.find("NtSetDebugFilterState") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtSetDebugFilterState");
+	}
 	else if (tmpStr.find("NtQueryInformationProcess") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtQueryInformationProcess");
+	}
 	else if (tmpStr.find("NtQuerySystemInformation") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtQuerySystemInformation");
+	}
 	else if (tmpStr.find("NtSetInformationThread") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtSetInformationThread");
+	}
 	else if (tmpStr.find("NtCreateUserProcess") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtCreateUserProcess");
+	}
 	else if (tmpStr.find("NtCreateThreadEx") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtCreateThreadEx");
+	}
 	else if (tmpStr.find("NtSystemDebugControl") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtSystemDebugControl");
+	}
 	else if (tmpStr.find("NtYieldExecution") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtYieldExecution");
+	}
 	else if (tmpStr.find("NtSetLdtEntries") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtSetLdtEntries");
+	}
 	else if (tmpStr.find("NtQueryInformationThread") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtQueryInformationThread");
+	}
 	else if (tmpStr.find("NtCreateDebugObject") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtCreateDebugObject");
+	}
 	else if (tmpStr.find("NtQueryObject") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtQueryObject");
+	}
 	else if (tmpStr.find("RtlAdjustPrivilege") != std::string::npos)
+	{
 		hookFunctions.emplace_back("RtlAdjustPrivilege");
+	}
 	else if (tmpStr.find("NtShutdownSystem") != std::string::npos)
+	{
 		hookFunctions.emplace_back("NtShutdownSystem");
+	}
 	else if (tmpStr.find("ZwAllocateVirtualMemory") != std::string::npos)
+	{
 		hookFunctions.emplace_back("ZwAllocateVirtualMemory");
+	}
 	else if (tmpStr.find("ZwGetWriteWatch") != std::string::npos)
+	{
 		hookFunctions.emplace_back("ZwGetWriteWatch");
 
 		// kernelbase
+	}
 	else if (tmpStr.find("IsDebuggerPresent") != std::string::npos)
+	{
 		hookFunctions.emplace_back("IsDebuggerPresent");
+	}
 	else if (tmpStr.find("CheckRemoteDebuggerPresent") != std::string::npos)
+	{
 		hookFunctions.emplace_back("CheckRemoteDebuggerPresent");
+	}
 	else if (tmpStr.find("SetUnhandledExceptionFilter") != std::string::npos)
+	{
 		hookFunctions.emplace_back("SetUnhandledExceptionFilter");
+	}
 	else if (tmpStr.find("RegOpenKeyExInternalW") != std::string::npos)
+	{
 		hookFunctions.emplace_back("RegOpenKeyExInternalW");
+	}
 	else if (tmpStr.find("RegQueryValueExW") != std::string::npos)
+	{
 		hookFunctions.emplace_back("RegQueryValueExW");
-
+	}
 }
 
-VOID GenRandStr(TCHAR* str, const size_t size) // just enough randomness
+std::wstring GenRandStr(const size_t size) // just enough randomness
 {
 	srand(static_cast<unsigned int>(time(nullptr)));
-	static const TCHAR syms[] =
+	static const TCHAR ALPHABET[] =
 		L"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		L"abcdefghijklmnopqrstuvwxyz";
-	for (size_t i = 0; i < size - 1; ++i)
+	std::wstring randString(size, '\x0');
+	for (auto& i : randString)
 	{
-		str[i] = syms[rand() / (RAND_MAX / (_tcslen(syms) - 1) + 1)];
+		i = ALPHABET[rand() / (RAND_MAX / (_tcslen(ALPHABET) - 1) + 1)];
 	}
-	str[size - 1] = 0;
+
+	return randString;
 }
 
 void SetHardwareBreakpoint(HANDLE tHandle, CONTEXT& cxt, const DWORD_PTR addr, size_t size, DrReg dbgReg)
@@ -189,11 +239,12 @@ void SetHardwareBreakpoint(HANDLE tHandle, CONTEXT& cxt, const DWORD_PTR addr, s
 
 int _tmain()
 {
+
 	// welcome 
-	const TCHAR welcome[] = L"makin --- Copyright (c) 2018 Lasha Khasaia\n"
+	const TCHAR welcome[] = L"makin --- Copyright (c) 2019 Lasha Khasaia\n"
 		L"https://www.secrary.com - @_qaz_qaz\n"
 		L"----------------------------------------------------\n\n";
-	wprintf(L"%s", welcome);
+	wprintf(L"%s\n", welcome);
 
 	STARTUPINFO si{};
 	si.cb = sizeof(si);
@@ -241,7 +292,7 @@ int _tmain()
 	if (hFile == INVALID_HANDLE_VALUE)
 	{
 		err = GetLastError();
-		printf("CreateFile error: %ul\n", err);
+		printf("CreateFile error: %lu\n", err);
 		return err;
 	}
 
@@ -258,43 +309,44 @@ int _tmain()
 	                                        size.LowPart,
 	                                        nullptr);
 
-	if (!hMapFile)
+	if (hMapFile == nullptr)
 	{
 		err = GetLastError();
-		printf("CreateFileMapping is NULL: %ul", err);
+		printf("CreateFileMapping is NULL: %lu", err);
 		return err;
 	}
 
 	// Map just one page
 	auto lpMapAddress = MapViewOfFile(hMapFile,
-	                               FILE_MAP_READ,
-	                               0,
-	                               0,
-	                               sysInfo.dwPageSize); // one page size is more than we need for now
+	                                  FILE_MAP_READ,
+	                                  0,
+	                                  0,
+	                                  sysInfo.dwPageSize); // one page size is more than we need for now
 
-	if (!lpMapAddress)
+	if (lpMapAddress == nullptr)
 	{
 		err = GetLastError();
-		printf("MapViewOfFIle is NULL: %ul\n", err);
+		printf("MapViewOfFIle is NULL: %lu\n", err);
 		return err;
 	}
 	// IMAGE_DOS_HEADER->e_lfanew
-	const auto e_lfanew = *reinterpret_cast<DWORD*>(static_cast<byte*>(lpMapAddress) + sizeof(IMAGE_DOS_HEADER) - sizeof(
-		DWORD));
+	const auto e_lfanew = *reinterpret_cast<DWORD*>(static_cast<byte*>(lpMapAddress) + sizeof(IMAGE_DOS_HEADER) - sizeof
+		(
+			DWORD));
 	UnmapViewOfFile(lpMapAddress);
 
 
 	const auto ntMapAddrLow = (e_lfanew / sysInfo.dwAllocationGranularity) * sysInfo.dwAllocationGranularity;
 	lpMapAddress = MapViewOfFile(hMapFile,
-	                          FILE_MAP_READ,
-	                          0,
-	                          ntMapAddrLow,
-	                          sysInfo.dwPageSize);
+	                             FILE_MAP_READ,
+	                             0,
+	                             ntMapAddrLow,
+	                             sysInfo.dwPageSize);
 
-	if (!lpMapAddress)
+	if (lpMapAddress == nullptr)
 	{
 		err = GetLastError();
-		printf("MapViewOfFIle is NULL: %ul\n", err);
+		printf("MapViewOfFIle is NULL: %lu\n", err);
 		return err;
 	}
 
@@ -304,23 +356,25 @@ int _tmain()
 		ntHeaderAddr = static_cast<byte*>(ntHeaderAddr) + e_lfanew;
 	}
 
-	if (PIMAGE_NT_HEADERS(ntHeaderAddr)->OptionalHeader.DataDirectory[9].VirtualAddress)
+	if (PIMAGE_NT_HEADERS(ntHeaderAddr)->OptionalHeader.DataDirectory[9].VirtualAddress != 0u)
 	{
 		printf(
 			"[TLS] The executable contains TLS callback(s)\nI can not hook code executed by TLS callbacks\nPlease, abort execution and check it manually\n[c]ontinue / [A]bort: \n\n");
-		const char ic = getchar();
+		const auto ic = getchar();
 		if (ic != 'c')
+		{
 			ExitProcess(0);
+		}
 	}
 
 	const DWORD_PTR sizeOfImage = PIMAGE_NT_HEADERS(ntHeaderAddr)->OptionalHeader.SizeOfImage;
 
 	UnmapViewOfFile(lpMapAddress);
+	CloseHandle(hMapFile);
 	CloseHandle(hFile);
 
 	wprintf(L"PROCESS NAME: %s\nCOMMAND LINE: %s\n\n", proc_path, cmdLine);
 
-	// !!! copy capstone.dll to curr dir
 	if (!CreateProcess(proc_path, cmdLine, nullptr, nullptr, FALSE,
 	                   DEBUG_ONLY_THIS_PROCESS | CREATE_SUSPENDED | DETACHED_PROCESS, nullptr, nullptr, &si, &pi))
 	{
@@ -342,7 +396,7 @@ int _tmain()
 	const auto pBeingDebugged = DWORD_PTR(reinterpret_cast<byte*>(peb) + 0x2); // PEB->BeingDebugged
 
 #ifndef _WIN64
-   peb -= 0x1000; // 32-bit PEB
+	peb -= 0x1000; // 32-bit PEB
 #endif
 
 	const auto pImageBaseAddress = DWORD_PTR(reinterpret_cast<byte*>(peb) + 0x10);
@@ -350,8 +404,10 @@ int _tmain()
 
 	DWORD_PTR imageBaseAddress{};
 	SIZE_T ret{};
-	if (pImageBaseAddress)
+	if (pImageBaseAddress != 0u)
+	{
 		ReadProcessMemory(pi.hProcess, PVOID(pImageBaseAddress), &imageBaseAddress, sizeof(DWORD_PTR), &ret);
+	}
 
 	SetHardwareBreakpoint(pi.hThread, cxt, pBeingDebugged, 1, Dr0);
 
@@ -360,8 +416,8 @@ int _tmain()
 #ifdef _WIN64
 	pNtGlobalFlag = DWORD_PTR(reinterpret_cast<byte*>(peb) + 0xBC);
 #else
-   pNtGlobalFlag = DWORD_PTR(reinterpret_cast<byte*>(peb) + 0x68);
-   pNtGlobalFlag += 0x1000; // 32-bit PEB
+	pNtGlobalFlag = DWORD_PTR(reinterpret_cast<byte*>(peb) + 0x68);
+	pNtGlobalFlag += 0x1000; // 32-bit PEB
 #endif
 
 	SetHardwareBreakpoint(pi.hThread, cxt, pNtGlobalFlag, 2, Dr1);
@@ -414,43 +470,40 @@ int _tmain()
 	}
 
 	// generate random name for asho.dll ;)
-	TCHAR randAsho[0x5]{};
-	GenRandStr(randAsho, 0x5);
 	TCHAR ashoTmpDir[MAX_PATH + 2]{};
 	GetTempPath(MAX_PATH + 2, ashoTmpDir);
-	_tcscat_s(ashoTmpDir, randAsho);
-	_tcscat_s(ashoTmpDir, L".dll");
-	const auto cStatus = CopyFile(dll_path, ashoTmpDir, FALSE);
-	if (!cStatus)
+	auto ashoPath = std::wstring{ashoTmpDir} + GenRandStr(6) + L".dll";
+	const auto cStatus = CopyFile(dll_path, ashoPath.c_str(), FALSE);
+	if (cStatus == 0)
 	{
 		err = GetLastError();
-		wprintf(L"[!] CopyFile failed: %ul\n", err);
+		wprintf(L"[!] CopyFile failed: %lu\n", err);
 
 		return err;
 	}
-	if (!PathFileExists(ashoTmpDir))
+	if (!PathFileExists(ashoPath.c_str()))
 	{
 		err = GetLastError();
-		wprintf(L"[!] %s is not a valid file\n", ashoTmpDir);
+		wprintf(L"[!] %s is not a valid file\n", ashoPath.c_str());
 
 		return err;
 	}
 
 	const auto p_alloc = VirtualAllocEx(pi.hProcess, nullptr, MAX_PATH + 2, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-	if (!p_alloc)
+	if (p_alloc == nullptr)
 	{
 		err = GetLastError();
 		printf("[!] Allocation failed: %lu\n", err);
 		return err;
 	}
-	if (!WriteProcessMemory(pi.hProcess, p_alloc, ashoTmpDir, MAX_PATH + 2, nullptr))
+	if (WriteProcessMemory(pi.hProcess, p_alloc, ashoPath.c_str(), MAX_PATH + 2, nullptr) == 0)
 	{
 		err = GetLastError();
 		printf("WriteProcessMemory failed: %lu\n", err);
 		return err;
 	}
 	const auto h_module = GetModuleHandle(L"kernel32");
-	if (!h_module)
+	if (h_module == nullptr)
 	{
 		err = GetLastError();
 		printf("GetmModuleHandle failed: %lu\n", err);
@@ -458,7 +511,7 @@ int _tmain()
 	}
 	const auto loadLibraryAddress = GetProcAddress(h_module, "LoadLibraryW");
 
-	if (!loadLibraryAddress)
+	if (loadLibraryAddress == nullptr)
 	{
 		err = GetLastError();
 		printf("GetProcAddress failed: %lu\n", err);
@@ -466,7 +519,7 @@ int _tmain()
 	}
 
 	const auto qStatus = QueueUserAPC(PAPCFUNC(loadLibraryAddress), pi.hThread, ULONG_PTR(p_alloc));
-	if (!qStatus)
+	if (qStatus == 0u)
 	{
 		err = GetLastError();
 		printf("QueueUserAPC failed: %lu\n", err);
@@ -475,10 +528,10 @@ int _tmain()
 
 	ResumeThread(pi.hThread);
 
-	while (!done)
+	while (done == 0)
 	{
 		auto contStatus = DBG_CONTINUE;
-		if (WaitForDebugEvent(&d_event, INFINITE))
+		if (WaitForDebugEvent(&d_event, INFINITE) != 0)
 		{
 			switch (d_event.dwDebugEventCode)
 			{
@@ -489,8 +542,7 @@ int _tmain()
 				break;
 			case LOAD_DLL_DEBUG_EVENT:
 				// we get load dll as file handle 
-				GetFinalPathNameByHandleA(d_event.u.LoadDll.hFile, filePath, MAX_PATH + 2, 0);
-				if (filePath)
+				if (GetFinalPathNameByHandleA(d_event.u.LoadDll.hFile, filePath, MAX_PATH + 2, 0) != 0u)
 				{
 					const std::string tmpStr(filePath + 4);
 					loadDll.emplace_back(tmpStr);
@@ -501,8 +553,10 @@ int _tmain()
 
 			case EXCEPTION_DEBUG_EVENT:
 				contStatus = DBG_EXCEPTION_NOT_HANDLED;
-				if (!d_event.u.Exception.dwFirstChance)
+				if (d_event.u.Exception.dwFirstChance == 0u)
+				{
 					break;
+				}
 				switch (d_event.u.Exception.ExceptionRecord.ExceptionCode)
 				{
 				case EXCEPTION_ACCESS_VIOLATION:
@@ -513,7 +567,7 @@ int _tmain()
 
 				case EXCEPTION_BREAKPOINT:
 
-					if (!first_its_me)
+					if (first_its_me == 0)
 					{
 						first_its_me = TRUE;
 						break;
@@ -535,37 +589,57 @@ int _tmain()
 					// HANDLE hardware accesses
 
 					tHandle = OpenThread(GENERIC_ALL, FALSE, d_event.dwThreadId);
-					if (!tHandle)
+					if (tHandle == nullptr)
+					{
 						break;
-					cxt.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+					}
+					cxt.ContextFlags = CONTEXT_ALL;
 					GetThreadContext(tHandle, &cxt);
-					CloseHandle(tHandle);
 
-					if (cxt.Dr6 & 0b1111) //  There are HBs
+					if ((cxt.Dr6 & 0b1111) != 0u)
+					{
+						//  There are HBs
 						contStatus = DBG_EXCEPTION_HANDLED;
+					}
 					else
+					{
 						printf("[EXCEPTION] EXCEPTION_SINGLE_STEP\n");
+					}
 
 					if (expAddress > imageBaseAddress && expAddress < imageBaseAddress + sizeOfImage)
 					{
-						if (cxt.Dr6 & 0x1)
+						if ((cxt.Dr6 & 0x1) != 0u)
+						{
 							printf(
 								"[PEB->BeingDebugged] The debuggee attempts to detect a debugger.\nBase address of the image: 0x%p\nException address: 0x%p\nRVA: 0x%p\n\n",
 								PVOID(imageBaseAddress), PVOID(expAddress), PVOID(expAddress - imageBaseAddress));
-						else if (cxt.Dr6 & 0b10)
+						}
+						else if ((cxt.Dr6 & 0b10) != 0u)
+						{
 							printf(
 								"[PEB->NtGlobalFlag] The debuggee attempts to detect a debugger.\nBase address of the image: 0x%p\nException address: 0x%p\nRVA: 0x%p\n\n",
 								PVOID(imageBaseAddress), PVOID(expAddress), PVOID(expAddress - imageBaseAddress));
-						else if (cxt.Dr6 & 0b100)
+						}
+						else if ((cxt.Dr6 & 0b100) != 0u)
+						{
 							printf(
 								"[UserSharedData->KdDebuggerEnabled] The debuggee attempts to detect a debugger.\nBase address of the image: 0x%p\nException address: 0x%p\nRVA: 0x%p\n\n",
 								PVOID(imageBaseAddress), PVOID(expAddress), PVOID(expAddress - imageBaseAddress));
-						else if (cxt.Dr6 & 0b1000)
+						}
+						else if ((cxt.Dr6 & 0b1000) != 0u)
+						{
 							printf("DR3\n"); // Not implemented yet
+						}
+#ifdef _WIN64
+						cxt.Rax = 0; // maybe works on most cases
+#else
+						cxt.Eax = 0;
+#endif
+						SetThreadContext(tHandle, &cxt);
 
-						break;
 					}
 
+					CloseHandle(tHandle);
 					break;
 
 				case DBG_CONTROL_C:
@@ -644,7 +718,7 @@ int _tmain()
 	//if (hFileIda == INVALID_HANDLE_VALUE)
 	//{
 	//   err = GetLastError();
-	//   wprintf(L"CreateFile failed: %ul", err);
+	//   wprintf(L"CreateFile failed: %lu", err);
 	//}
 
 	//WriteFile(hFileIda, header, strlen(header), nullptr, nullptr);
